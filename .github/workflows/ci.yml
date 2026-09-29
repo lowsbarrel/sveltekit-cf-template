@@ -203,7 +203,7 @@ jobs:
       - run: bun run db:migrate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      - uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0
+      - uses: cloudflare/wrangler-action@4e88846969242f7752bcfdaf5511bfbb3985ca47
         id: deploy
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
