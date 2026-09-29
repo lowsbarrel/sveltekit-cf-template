@@ -1,0 +1,155 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+	/* Brand color, the one home for primary-*: swap these values to rebrand (docs/ui.md). */
+	--color-primary-50: #eff6ff;
+	--color-primary-100: #dbeafe;
+	--color-primary-200: #bfdbfe;
+	--color-primary-300: #93c5fd;
+	--color-primary-400: #60a5fa;
+	--color-primary-500: #3b82f6;
+	--color-primary-600: #2563eb;
+	--color-primary-700: #1d4ed8;
+	--color-primary-800: #1e40af;
+	--color-primary-900: #1e3a8a;
+	--color-primary-950: #172554;
+
+	--font-sans:
+		'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* @theme inline keeps these as var() refs so the .dark overrides below win at runtime (docs/ui.md). */
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-success: var(--success);
+	--color-warning: var(--warning);
+	--color-link: var(--link);
+}
+
+:root {
+	--background: #ffffff;
+	--foreground: #0a0a0a;
+	--card: #ffffff;
+	--card-foreground: #0a0a0a;
+	--popover: #ffffff;
+	--popover-foreground: #0a0a0a;
+	--muted: #f3f4f6;
+	--muted-foreground: #6b7280;
+	--border: #e5e7eb;
+	--input: #d1d5db;
+	--ring: var(--color-primary-500);
+	--destructive: #dc2626;
+	--destructive-foreground: #ffffff;
+	--success: #166534;
+	--warning: #92400e;
+	--link: var(--color-primary-700);
+}
+
+.dark {
+	--background: #0a0a0a;
+	--foreground: #fafafa;
+	--card: #171717;
+	--card-foreground: #fafafa;
+	--popover: #171717;
+	--popover-foreground: #fafafa;
+	--muted: #262626;
+	--muted-foreground: #a3a3a3;
+	--border: #262626;
+	--input: #404040;
+	--ring: var(--color-primary-400);
+	--destructive: #ef4444;
+	--destructive-foreground: #ffffff;
+	--success: #4ade80;
+	--warning: #fbbf24;
+	--link: var(--color-primary-400);
+}
+
+body {
+	font-family: var(--font-sans);
+	background-color: var(--color-background);
+	color: var(--color-foreground);
+}
+
+.prose {
+	line-height: 1.75;
+	color: var(--color-foreground);
+	word-break: break-word;
+}
+.prose > :first-child {
+	margin-top: 0;
+}
+.prose h2 {
+	font-size: 1.5rem;
+	font-weight: 600;
+	margin: 2rem 0 0.75rem;
+}
+.prose h3 {
+	font-size: 1.25rem;
+	font-weight: 600;
+	margin: 1.5rem 0 0.5rem;
+}
+.prose p {
+	margin: 1rem 0;
+}
+.prose a {
+	color: var(--color-link);
+	text-decoration: underline;
+}
+.prose ul,
+.prose ol {
+	margin: 1rem 0;
+	padding-left: 1.5rem;
+}
+.prose ul {
+	list-style: disc;
+}
+.prose ol {
+	list-style: decimal;
+}
+.prose li {
+	margin: 0.25rem 0;
+}
+.prose code {
+	background: var(--color-muted);
+	padding: 0.15em 0.35em;
+	border-radius: 0.25rem;
+	font-size: 0.9em;
+}
+.prose pre {
+	background: #1e293b;
+	color: #e2e8f0;
+	padding: 1rem;
+	border-radius: 0.5rem;
+	overflow-x: auto;
+	margin: 1.25rem 0;
+}
+.prose pre code {
+	background: transparent;
+	padding: 0;
+	color: inherit;
+}
+.prose blockquote {
+	border-left: 3px solid var(--color-border);
+	padding-left: 1rem;
+	color: var(--color-muted-foreground);
+	margin: 1.25rem 0;
+}
+.prose img {
+	max-width: 100%;
+	height: auto;
+	border-radius: 0.5rem;
+}
