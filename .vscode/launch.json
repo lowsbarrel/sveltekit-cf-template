@@ -1,0 +1,59 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Dev: full stack",
+			"type": "node",
+			"request": "launch",
+			"runtimeExecutable": "bun",
+			"runtimeArgs": ["run", "dev"],
+			"cwd": "${workspaceFolder}/app",
+			"console": "integratedTerminal",
+			"skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+			"serverReadyAction": {
+				"pattern": "Local: +(https?://\\S+)",
+				"uriFormat": "%s",
+				"action": "debugWithChrome"
+			}
+		},
+		{
+			"name": "Vitest: current file",
+			"type": "node",
+			"request": "launch",
+			"program": "${workspaceFolder}/app/node_modules/vitest/vitest.mjs",
+			"args": ["run", "${file}", "--inspect-brk=9229", "--no-file-parallelism"],
+			"cwd": "${workspaceFolder}/app",
+			"console": "integratedTerminal",
+			"skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+		},
+		{
+			"name": "Attach to workerd",
+			"type": "node",
+			"request": "attach",
+			"port": 9229,
+			"cwd": "/",
+			"resolveSourceMapLocations": null,
+			"attachExistingChildren": false,
+			"autoAttachChildProcesses": false
+		},
+		{
+			"name": "Attach to Chromium",
+			"type": "chrome",
+			"request": "attach",
+			"port": 9229,
+			"webRoot": "${workspaceFolder}/app"
+		}
+	],
+	"compounds": [
+		{
+			"name": "Debug current test file",
+			"configurations": ["Attach to workerd", "Vitest: current file"],
+			"stopAll": true
+		},
+		{
+			"name": "Debug current component test",
+			"configurations": ["Attach to Chromium", "Vitest: current file"],
+			"stopAll": true
+		}
+	]
+}

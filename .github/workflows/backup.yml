@@ -1,0 +1,62 @@
+name: Backup
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      DATABASE_URL_BACKUP: ${{ secrets.DATABASE_URL_BACKUP }}
+      BACKUP_AGE_PUBLIC_KEY: ${{ secrets.BACKUP_AGE_PUBLIC_KEY }}
+    steps:
+      - name: Check configuration
+        id: cfg
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_URL_BACKUP:-}" ]; then
+            echo "DATABASE_URL_BACKUP is unset; backups are not configured for this repo. Skipping."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${BACKUP_AGE_PUBLIC_KEY:-}" ]; then
+            echo "::error::Backups are configured but BACKUP_AGE_PUBLIC_KEY is unset. An off-site full-database dump must be encrypted; generate an age key and set the secret. See docs/backups.md."
+            exit 1
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Install postgresql-client and age
+        if: steps.cfg.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17 age
+
+      - name: Dump, encrypt, and upload to R2
+        if: steps.cfg.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          ts="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+          file="dump-$ts.pgc.gz.age"
+          pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL_BACKUP" \
+            | gzip \
+            | age -r "$BACKUP_AGE_PUBLIC_KEY" -o "$file"
+          aws s3 cp "$file" "s3://$R2_BUCKET/backups/$file" \
+            --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          echo "uploaded backups/$file"

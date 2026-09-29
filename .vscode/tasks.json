@@ -1,0 +1,62 @@
+{
+	"version": "2.0.0",
+	"options": {
+		"cwd": "${workspaceFolder}/app"
+	},
+	"tasks": [
+		{
+			"label": "bun: dev",
+			"type": "shell",
+			"command": "bun run dev",
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "bun: build",
+			"type": "shell",
+			"command": "bun run build",
+			"group": { "kind": "build", "isDefault": true },
+			"problemMatcher": []
+		},
+		{
+			"label": "bun: test",
+			"type": "shell",
+			"command": "bun run test",
+			"group": { "kind": "test", "isDefault": true },
+			"problemMatcher": []
+		},
+		{
+			"label": "bun: check",
+			"type": "shell",
+			"command": "bun run check",
+			"problemMatcher": []
+		},
+		{
+			"label": "bun: lint",
+			"type": "shell",
+			"command": "bun run lint",
+			"problemMatcher": []
+		},
+		{
+			"label": "bun: format",
+			"type": "shell",
+			"command": "bun run format",
+			"problemMatcher": []
+		},
+		{
+			"label": "bun: preview (Workers runtime)",
+			"type": "shell",
+			"command": "bun run preview",
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "gate: pre-commit",
+			"type": "shell",
+			"command": "sh .githooks/pre-commit",
+			"options": { "cwd": "${workspaceFolder}" },
+			"group": "test",
+			"problemMatcher": []
+		}
+	]
+}

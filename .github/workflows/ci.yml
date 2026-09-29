@@ -1,0 +1,247 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  conventions:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+      - name: PR title follows Conventional Commits
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|docs|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9./-]+\))?!?: .+'
+          echo "$TITLE" | grep -qE "$pattern" \
+            || { echo "PR title must be Conventional Commits, e.g. 'feat(notes): add folder rename'"; exit 1; }
+          [ "${#TITLE}" -le 72 ] || { echo "PR title over 72 characters"; exit 1; }
+      - name: Commit messages follow Conventional Commits
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          pattern='^(feat|fix|docs|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9./-]+\))?!?: .+'
+          bad=0
+          while IFS= read -r subject; do
+            case "$subject" in "Merge "*) continue ;; esac
+            echo "$subject" | grep -qE "$pattern" || { echo "not conventional: $subject"; bad=1; }
+            [ "${#subject}" -le 72 ] || { echo "over 72 characters: $subject"; bad=1; }
+          done < <(git log --format=%s "$BASE".."$HEAD")
+          exit "$bad"
+
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - name: Fail if template placeholders were not replaced
+        if: ${{ !github.event.repository.is_template }}
+        run: '! grep -rniE "sveltekit[-_ ]?cf[-_ ]?template|__HYPERDRIVE_ID__" package.json wrangler.jsonc src'
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: app/package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run check:invariants
+      - run: bun run check:secrets
+      - run: bun run lint
+      - run: bun run check
+      - run: bunx playwright install chromium --with-deps
+      - run: bun run test
+      - run: bun run build
+      - name: Bundle size guardrail
+        run: |
+          bunx wrangler deploy --dry-run --outdir dist-check
+          SIZE=$(cat dist-check/*.js | gzip -c | wc -c | tr -d ' ')
+          echo "worker bundle gzipped: ${SIZE} bytes"
+          [ "$SIZE" -lt 2000000 ] || { echo "bundle over 2 MB gzipped - check what you imported"; exit 1; }
+      - run: bun run test:e2e
+
+  portability:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: app/package.json
+      - run: bun install --frozen-lockfile
+      - run: ADAPTER=node bun run build
+      - name: Boot and smoke test
+        run: |
+          PORT=3000 node build/index.js &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health && exit 0
+            sleep 0.5
+          done
+          echo "Node build did not answer" >&2
+          exit 1
+
+  audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: app/package.json
+      - run: >-
+          bun audit --prod --audit-level=high
+          --ignore GHSA-r28c-9q8g-f849
+          --ignore GHSA-28wg-ghj8-5hjv
+          --ignore GHSA-2v37-7h3g-55p8
+
+  ci:
+    if: ${{ always() }}
+    needs: [conventions, test, portability, audit]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All required jobs succeeded
+        run: |
+          for r in "${{ needs.conventions.result }}" "${{ needs.test.result }}" \
+                   "${{ needs.portability.result }}" "${{ needs.audit.result }}"; do
+            case "$r" in
+              success | skipped) ;;
+              *) echo "required job did not succeed: $r"; exit 1 ;;
+            esac
+          done
+          echo "all required jobs succeeded"
+
+  preview:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && !github.event.repository.is_template
+    needs: [test, portability]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: app/package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - name: Deploy per-branch preview
+        id: preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          out=$(bunx wrangler preview --name "pr-${{ github.event.number }}" --json)
+          echo "$out"
+          echo "url=$(echo "$out" | jq -er '.preview_urls[0] // .preview.urls[0] // .url // empty')" >> "$GITHUB_OUTPUT"
+      - name: Comment preview URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ steps.preview.outputs.url }}
+        run: |
+          gh pr comment "${{ github.event.number }}" --edit-last --create-if-none \
+            --body "**Preview:** ${URL:-created as \`pr-${{ github.event.number }}\`}"
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !github.event.repository.is_template
+    needs: [test, portability]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    outputs:
+      url: ${{ steps.deploy.outputs.deployment-url }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: app/package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0
+        id: deploy
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: app
+          command: deploy
+
+  smoke:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !github.event.repository.is_template
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: app/package.json
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install chromium --with-deps
+      - name: Smoke test the live deployment
+        env:
+          TEST_PAGE_URL: ${{ vars.PRODUCTION_URL || needs.deploy.outputs.url }}
+        run: bun run test:smoke
+
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'

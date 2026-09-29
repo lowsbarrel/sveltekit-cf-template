@@ -1,0 +1,80 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "sveltekit-cf-template",
+	"main": "src/worker.ts",
+	"compatibility_date": "2026-07-10",
+	"compatibility_flags": ["nodejs_compat", "nodejs_als"],
+	// "placement": { "mode": "smart" },
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	// "routes": [{ "pattern": "app.example.com", "custom_domain": true }],
+	"observability": {
+		"enabled": true
+		// Opt-in knobs - uncomment and add a comma after "enabled" above. See docs/deploy.md:
+		// "head_sampling_rate": 0.1, // sample logs to 10% (default 1 = 100%) at high traffic to cut cost
+		// "logs": { "invocation_logs": true }, // CPU time / wall time per invocation
+		// "traces": { "enabled": true, "head_sampling_rate": 0.05 } // request tracing; auto-instruments fetch/KV/R2/DO; free in beta
+	},
+	"upload_source_maps": true,
+	"hyperdrive": [
+		{
+			"binding": "HYPERDRIVE",
+			"id": "__HYPERDRIVE_ID__",
+			"localConnectionString": "postgresql://postgres:postgres@localhost:5432/app"
+		}
+		// {
+		// 	"binding": "HYPERDRIVE_CACHED",
+		// 	"id": "__HYPERDRIVE_CACHED_ID__",
+		// 	"localConnectionString": "postgresql://postgres:postgres@localhost:5432/app"
+		// }
+	],
+	"triggers": {
+		"crons": ["0 3 * * *"]
+	},
+	// "queues": {
+	// 	"producers": [{ "binding": "JOBS", "queue": "jobs" }],
+	// 	"consumers": [{ "queue": "jobs", "max_retries": 3 }]
+	// },
+	// "workflows": [
+	// 	{ "binding": "EXAMPLE_WORKFLOW", "name": "example", "class_name": "ExampleWorkflow" }
+	// ],
+	// "kv_namespaces": [{ "binding": "KV", "id": "__KV_ID__" }],
+	// "r2_buckets": [{ "binding": "R2", "bucket_name": "__BUCKET_NAME__" }],
+	"ratelimits": [
+		{
+			"name": "RATE_LIMITER",
+			"namespace_id": "1001",
+			"simple": { "limit": 100, "period": 60 }
+		}
+	],
+	// Worker Previews inherit nothing from above; never add crons, routes or queue consumers (docs/deploy.md).
+	"previews": {
+		"hyperdrive": [
+			{
+				"binding": "HYPERDRIVE",
+				"id": "__PREVIEW_HYPERDRIVE_ID__",
+				"localConnectionString": "postgresql://postgres:postgres@localhost:5432/app"
+			}
+		]
+		// "kv_namespaces": [{ "binding": "KV", "id": "<preview-kv-id>" }],
+		// "r2_buckets": [{ "binding": "R2", "bucket_name": "preview-bucket" }],
+		// "durable_objects": { "bindings": [{ "name": "COUNTER", "class_name": "Counter" }] }
+	}
+	// "ai": { "binding": "AI" }
+	// "send_email": [{ "name": "EMAIL" }],
+	// "vars": {
+	// 	"R2_ACCOUNT_ID": "<account id>",
+	// 	"R2_BUCKET": "<bucket>",
+	// 	"R2_PUBLIC_URL": "https://cdn.yourdomain.com",
+	// 	"EMAIL_FROM": "App <noreply@yourdomain.com>",
+	// 	"TURNSTILE_SITE_KEY": "0x<Turnstile site key - captcha; pair with the TURNSTILE_SECRET_KEY secret>",
+	// 	"CREEM_PRODUCT_PRO": "prod_<id from the Creem dashboard>",
+	// 	"CREEM_PRODUCT_TEAM": "prod_<id from the Creem dashboard>",
+	// 	"CREEM_PRODUCT_LIFETIME": "prod_<id from the Creem dashboard - one-time product>",
+	// 	"PUBLIC_POSTHOG_KEY": "phc_<project key>",
+	// 	"PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
+	// 	"PUBLIC_REALTIME_URL": "wss://<your realtime sidecar worker>.workers.dev" // + REALTIME_SECRET secret; see docs/realtime.md
+	// }
+}

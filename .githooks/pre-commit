@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+top="$(git rev-parse --show-toplevel)"
+export GIT_WORK_TREE="$top"
+cd "$top/app"
+
+echo "pre-commit ▸ bun run check:invariants"
+bun run check:invariants
+echo "pre-commit ▸ bun run check:secrets"
+bun run check:secrets
+echo "pre-commit ▸ bun run lint"
+bun run lint
+echo "pre-commit ▸ bun run check"
+bun run check
+echo "pre-commit ▸ bun run test"
+bun run test

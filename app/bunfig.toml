@@ -1,0 +1,18 @@
+[install]
+# Seconds, not pnpm's minutes: 7 days.
+minimumReleaseAge = 604800
+# Near-daily, exact-pinned Cloudflare binaries can't back off, so the age gate would block every resolve.
+minimumReleaseAgeExcludes = [
+  "wrangler",
+  "workerd",
+  "miniflare",
+  "@cloudflare/vitest-pool-workers",
+  "@cloudflare/kv-asset-handler",
+  "@cloudflare/unenv-preset",
+  "@cloudflare/workers-types",
+  "@cloudflare/workerd-darwin-64",
+  "@cloudflare/workerd-darwin-arm64",
+  "@cloudflare/workerd-linux-64",
+  "@cloudflare/workerd-linux-arm64",
+  "@cloudflare/workerd-windows-64"
+]

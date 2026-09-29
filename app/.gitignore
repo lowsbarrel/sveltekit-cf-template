@@ -1,0 +1,10 @@
+/.svelte-kit/
+/.wrangler/
+/build/
+/dist-check/
+/test-results/
+/playwright-report/
+/src/worker-configuration.d.ts
+/src/lib/paraglide/
+/project.inlang/cache/
+/vite.config.*.timestamp-*

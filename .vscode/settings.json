@@ -1,0 +1,30 @@
+{
+	"editor.defaultFormatter": "esbenp.prettier-vscode",
+	"editor.formatOnSave": true,
+	"editor.codeActionsOnSave": {
+		"source.fixAll.eslint": "explicit"
+	},
+	"[svelte]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"eslint.validate": ["javascript", "typescript", "svelte"],
+	"eslint.workingDirectories": ["app"],
+
+	"js/ts.tsdk.path": "app/node_modules/typescript/lib",
+	"js/ts.tsdk.promptToUseWorkspaceVersion": true,
+	"svelte.enable-ts-plugin": true,
+
+	"npm.packageManager": "bun",
+	"files.exclude": {
+		"**/.svelte-kit": true,
+		"**/.wrangler": true
+	},
+	"search.exclude": {
+		"**/node_modules": true
+	},
+	"files.readonlyInclude": {
+		"app/src/worker-configuration.d.ts": true,
+		"app/src/lib/paraglide/**": true
+	},
+	"files.eol": "\n"
+}

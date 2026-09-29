@@ -1,0 +1,14 @@
+// Build-output config for @sveltejs/adapter-cloudflare ONLY - vite.config.ts
+// passes it through the adapter's `config` option. The adapter deletes and
+// rewrites whatever `main` points at, so it must not read wrangler.jsonc:
+// there `main` is src/worker.ts, the hand-written entry that wraps this
+// output. Deploys, wrangler dev and typegen all use wrangler.jsonc; only the
+// keys below matter here.
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	}
+}

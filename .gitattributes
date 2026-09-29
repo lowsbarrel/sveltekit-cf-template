@@ -1,0 +1,11 @@
+* text=auto eol=lf
+
+app/bun.lock                       -diff linguist-generated
+app/drizzle/**                     linguist-generated
+app/src/lib/paraglide/**           linguist-generated
+app/src/worker-configuration.d.ts  linguist-generated
+
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.woff2 binary

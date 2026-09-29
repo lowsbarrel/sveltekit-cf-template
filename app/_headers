@@ -1,0 +1,8 @@
+# Static assets (including prerendered pages) are served before the Worker runs,
+# so handleSecurityHeaders in src/hooks.server.ts never sees them. Keep in sync.
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
