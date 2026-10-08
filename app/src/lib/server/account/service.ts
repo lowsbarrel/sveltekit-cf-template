@@ -1,7 +1,7 @@
-import { and, desc, eq, gt, inArray, ne } from 'drizzle-orm';
+import { and, desc, eq, gt, ne } from 'drizzle-orm';
 import { AVATAR_MAX_BYTES, AVATAR_TYPES } from '$lib/avatar';
-import { account, member, passkey, session, subscription, user } from '../db/schema';
-import { isEntitled } from '../billing/entitlement';
+import { account, member, passkey, session, user } from '../db/schema';
+import { planForOrg } from '../billing/entitlement';
 import { AppError } from '../errors';
 import {
 	assertUploadWithin,
@@ -40,6 +40,7 @@ export async function avatarUploadTarget(
 	assertUploadWithin(file, AVATAR_POLICY);
 	const uploadUrl = await presignedUploadUrl(env, avatarKey(actor), {
 		contentType: file.contentType,
+		contentLength: file.size,
 		expiresIn: 300
 	});
 	return { uploadUrl };
@@ -72,7 +73,6 @@ export async function confirmAvatarUpload(ctx: Ctx, env: Env, actor: Actor) {
 export async function eraseUserData(env: Env, userId: string): Promise<void> {
 	if (!r2Configured(env)) return;
 	try {
-		await deleteObject(env, avatarKey({ id: userId }));
 		await putObject(
 			env,
 			`erasures/${userId}.json`,
@@ -80,7 +80,12 @@ export async function eraseUserData(env: Env, userId: string): Promise<void> {
 			{ contentType: 'application/json' }
 		);
 	} catch (e) {
-		console.error({ event: 'erasure.r2_failed', userId }, e);
+		console.error({ event: 'erasure.tombstone_failed', userId }, e);
+	}
+	try {
+		await deleteObject(env, avatarKey({ id: userId }));
+	} catch (e) {
+		console.error({ event: 'erasure.avatar_failed', userId }, e);
 	}
 }
 
@@ -137,22 +142,13 @@ export async function revokeOtherSessions(ctx: Ctx, actor: Actor, keepSessionId:
 		.where(and(eq(session.userId, actor.id), ne(session.id, keepSessionId)));
 }
 
-export async function ownsEntitledOrg(ctx: Ctx, actor: Actor): Promise<boolean> {
+export async function ownsEntitledOrg(ctx: Ctx, env: Env, actor: Actor): Promise<boolean> {
 	const owned = await ctx.db
 		.select({ orgId: member.organizationId })
 		.from(member)
 		.where(and(eq(member.userId, actor.id), eq(member.role, 'owner')));
-	if (!owned.length) return false;
-	const subs = await ctx.db
-		.select()
-		.from(subscription)
-		.where(
-			inArray(
-				subscription.organizationId,
-				owned.map((o) => o.orgId)
-			)
-		);
-	return subs.some((s) => isEntitled(s));
+	const plans = await Promise.all(owned.map((o) => planForOrg(ctx, env, o.orgId)));
+	return plans.some((plan) => plan.paid);
 }
 
 export async function listUserPasskeys(ctx: Ctx, actor: Actor) {

@@ -1,12 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import { AppError } from '../errors';
-import {
-	assertUploadWithin,
-	presignedDownloadUrl,
-	presignedUploadUrl,
-	r2Configured
-} from './service';
+import { assertUploadWithin, presignedUploadUrl, r2Configured } from './service';
 
 const configured = {
 	...env,
@@ -32,12 +27,14 @@ describe('r2 presigning', () => {
 		expect(url.searchParams.get('X-Amz-SignedHeaders')).toContain('content-type');
 	});
 
-	it('download and upload signatures differ (method is signed)', async () => {
-		const up = new URL(await presignedUploadUrl(configured, 'k', { expiresIn: 60 }));
-		const down = new URL(await presignedDownloadUrl(configured, 'k', { expiresIn: 60 }));
-		expect(up.searchParams.get('X-Amz-Signature')).not.toBe(
-			down.searchParams.get('X-Amz-Signature')
+	it('binds the declared byte length into the signature when given', async () => {
+		const url = new URL(
+			await presignedUploadUrl(configured, 'user-1/avatar.png', {
+				contentType: 'image/png',
+				contentLength: 2048
+			})
 		);
+		expect(url.searchParams.get('X-Amz-SignedHeaders')).toContain('content-length');
 	});
 
 	it('refuses to sign when credentials are missing', async () => {
@@ -46,7 +43,7 @@ describe('r2 presigning', () => {
 
 	it('rejects keys that would escape the actor prefix', async () => {
 		for (const key of ['user-1/../user-2/secret.png', '../bucket/x', 'a/b?x=1', 'a#b', '/abs']) {
-			await expect(presignedDownloadUrl(configured, key)).rejects.toMatchObject({
+			await expect(presignedUploadUrl(configured, key)).rejects.toMatchObject({
 				code: 'invalid'
 			});
 		}

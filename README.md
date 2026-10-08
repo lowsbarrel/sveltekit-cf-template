@@ -78,7 +78,7 @@ Two placeholders must be replaced before CI passes on your copy:
 1. **`sveltekit-cf-template`**, the identity token, anywhere in `app/package.json`, `app/wrangler.jsonc` and `app/src/` (the site name in `site.ts`, the consent cookie, the sample blog posts). CI searches for it case-insensitively.
 2. **`__HYPERDRIVE_ID__`** in `app/wrangler.jsonc`, once you create your Hyperdrive config.
 
-PR previews also need **`__PREVIEW_HYPERDRIVE_ID__`** in the `previews` block of `app/wrangler.jsonc` pointed at a preview Hyperdrive config; CI does not check that one.
+CI fails while any `__..._ID__` placeholder is left in `app/package.json`, `app/wrangler.jsonc` or `app/src/`, so that includes the `previews` block's **`__PREVIEW_HYPERDRIVE_ID__`** (point it at a preview Hyperdrive config) and the commented `HYPERDRIVE_CACHED` / `KV` ids - fill or delete them too.
 
 The `todos` feature is a worked example of the architecture (schema, actor-scoped service, protected page). Copy its shape, then delete it. [docs/setup.md](docs/setup.md) covers the rest.
 

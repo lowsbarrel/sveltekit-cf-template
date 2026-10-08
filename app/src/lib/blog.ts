@@ -63,3 +63,11 @@ export function getPost(slug: string): Post | undefined {
 export function categories(): string[] {
 	return [...new Set(posts.map((post) => post.category).filter((c): c is string => !!c))];
 }
+
+export function formatDate(iso: string): string {
+	return new Date(iso).toLocaleDateString(undefined, {
+		year: 'numeric',
+		month: 'long',
+		day: 'numeric'
+	});
+}

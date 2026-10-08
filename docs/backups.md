@@ -24,13 +24,18 @@ encrypted with `age`, uploaded to `s3://<bucket>/backups/`. Runs at
    and it must **not** run over the pooled host. Create a least-privilege role:
 
    ```sql
-   CREATE ROLE backup LOGIN PASSWORD '...';
+   CREATE ROLE backup LOGIN PASSWORD '...' BYPASSRLS;
    GRANT pg_read_all_data TO backup;   -- Postgres 14+ built-in role
    ```
 
    Its connection string must use the **direct** host, not the `-pooler` one
    (Neon's pooler and this app's Hyperdrive binding are poolers; `pg_dump` over a
    pooler is unsupported).
+
+   `BYPASSRLS` is required, not optional: `note` is `FORCE`d under row-level
+   security ([multi-tenancy.md](multi-tenancy.md)) and `pg_dump` turns
+   `row_security` off, so a plain role - even one with `pg_read_all_data` - errors
+   on the policy instead of dumping the table.
 
 2. **Secrets** (`gh secret set ...`): `DATABASE_URL_BACKUP` (the read-only
    unpooled URL), `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`,
@@ -63,7 +68,10 @@ pg_restore --clean --if-exists --no-owner --dbname "$TARGET_DATABASE_URL" restor
 ```
 
 The dump has no roles/ownership (`--no-owner --no-privileges`), so it restores
-under whatever role you connect as. Recreate the schema first if the target is
+under whatever role you connect as. That role must be `BYPASSRLS` (or a
+superuser) for the same reason the backup role is: restoring `note` rows under an
+org context that does not match the row would otherwise fail the policy's
+`WITH CHECK` and abort the restore. Recreate the schema first if the target is
 empty (the custom-format dump includes DDL, so `pg_restore` handles it).
 
 ## Erasure survives a restore (right to be forgotten)

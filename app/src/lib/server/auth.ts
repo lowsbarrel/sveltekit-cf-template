@@ -5,15 +5,14 @@ import { sveltekitCookies } from 'better-auth/svelte-kit';
 import { captcha, haveIBeenPwned, magicLink, twoFactor } from 'better-auth/plugins';
 import { organization } from 'better-auth/plugins/organization';
 import { passkey } from '@better-auth/passkey';
-import { and, count, eq, inArray } from 'drizzle-orm';
+import { and, count, eq, gt } from 'drizzle-orm';
+import * as m from '$lib/paraglide/messages';
 import { baseLocale, isLocale } from '$lib/paraglide/runtime';
 import { ac, roles } from '$lib/permissions';
-import { FREE_PLAN } from '$lib/plans';
 import { SITE } from '$lib/site';
-import { createDb } from './ctx';
-import { eraseUserData } from './account/service';
-import { isEntitled } from './billing/entitlement';
-import { planForProductId } from './billing/plans';
+import { createDb, type Ctx } from './ctx';
+import { eraseUserData, ownsEntitledOrg } from './account/service';
+import { planForOrg } from './billing/entitlement';
 import {
 	changeEmailEmail,
 	deleteAccountEmail,
@@ -47,6 +46,12 @@ export function createAuth(env: Env, baseURL: string, ctx: AuthContext = {}) {
 		);
 	}
 	const db = createDb(env);
+	const dbCtx: Ctx = {
+		db,
+		dbCached: db,
+		waitUntil: ctx.waitUntil ?? ((promise) => void promise.catch(() => {})),
+		close: async () => {}
+	};
 	const methods = authMethods(env);
 
 	const localeFor = async (email: string): Promise<Locale> => {
@@ -155,25 +160,10 @@ export function createAuth(env: Env, baseURL: string, ctx: AuthContext = {}) {
 					await sendEmail(env, deleteAccountEmail(user.email, url, await localeFor(user.email)));
 				},
 				beforeDelete: async (account) => {
-					const owned = await db
-						.select({ orgId: schema.member.organizationId })
-						.from(schema.member)
-						.where(and(eq(schema.member.userId, account.id), eq(schema.member.role, 'owner')));
-					if (owned.length) {
-						const subs = await db
-							.select()
-							.from(schema.subscription)
-							.where(
-								inArray(
-									schema.subscription.organizationId,
-									owned.map((o) => o.orgId)
-								)
-							);
-						if (subs.some((s) => isEntitled(s))) {
-							throw new APIError('BAD_REQUEST', {
-								message: 'Cancel your subscription before deleting your account.'
-							});
-						}
+					if (await ownsEntitledOrg(dbCtx, env, { id: account.id })) {
+						throw new APIError('BAD_REQUEST', {
+							message: 'Cancel your subscription before deleting your account.'
+						});
 					}
 				},
 				afterDelete: async (account) => {
@@ -214,6 +204,23 @@ export function createAuth(env: Env, baseURL: string, ctx: AuthContext = {}) {
 						if (ctx.waitUntil) ctx.waitUntil(welcome);
 						else void welcome.catch(() => {});
 					}
+				},
+				update: {
+					before: async (data) => {
+						const image = data.image;
+						if (image === undefined || image === null || image === '') return;
+						let allowed = false;
+						try {
+							allowed =
+								!!env.R2_PUBLIC_URL && new URL(image).origin === new URL(env.R2_PUBLIC_URL).origin;
+						} catch {}
+						if (allowed) return;
+						const sanitized = { ...data, image: undefined };
+						if (Object.values(sanitized).every((value) => value === undefined)) {
+							throw new APIError('BAD_REQUEST', { message: 'Invalid image URL' });
+						}
+						return { data: sanitized };
+					}
 				}
 			},
 			session: {
@@ -250,7 +257,8 @@ export function createAuth(env: Env, baseURL: string, ctx: AuthContext = {}) {
 				organizationHooks: {
 					beforeCreateInvitation: async (data) => {
 						const orgId = data.invitation.organizationId;
-						const [members, pending, [sub]] = await Promise.all([
+						// ponytail: better-auth inserts the invitation after this hook, so concurrent invites can overshoot maxMembers by the number of simultaneous requests; upgrade = a DB constraint
+						const [[members], [pending], plan] = await Promise.all([
 							db
 								.select({ n: count() })
 								.from(schema.member)
@@ -261,20 +269,17 @@ export function createAuth(env: Env, baseURL: string, ctx: AuthContext = {}) {
 								.where(
 									and(
 										eq(schema.invitation.organizationId, orgId),
-										eq(schema.invitation.status, 'pending')
+										eq(schema.invitation.status, 'pending'),
+										gt(schema.invitation.expiresAt, new Date())
 									)
 								),
-							db
-								.select()
-								.from(schema.subscription)
-								.where(eq(schema.subscription.organizationId, orgId))
+							planForOrg(dbCtx, env, orgId)
 						]);
-						const plan = isEntitled(sub) ? planForProductId(env, sub!.creemProductId) : FREE_PLAN;
 						const limit = plan.limits.maxMembers;
-						const used = (members[0]?.n ?? 0) + (pending[0]?.n ?? 0);
+						const used = (members?.n ?? 0) + (pending?.n ?? 0);
 						if (limit !== null && used >= limit) {
 							throw new APIError('FORBIDDEN', {
-								message: `Your plan allows ${limit} member${limit === 1 ? '' : 's'}. Upgrade to invite more.`
+								message: m.team_invite_limit_reached({ count: limit })
 							});
 						}
 					}

@@ -1,5 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import { planById, type PlanId } from '$lib/plans';
+import { CONSENT_COOKIE, CONSENT_GRANTED } from '$lib/consent';
 import { completeOnboarding, storageConfigured } from '$lib/server/account/service';
 import { startCheckout } from '$lib/server/billing/checkout';
 import { availablePlans, planProductId } from '$lib/server/billing/plans';
@@ -34,9 +35,10 @@ export const load: PageServerLoad = async ({ platform, locals }) => {
 };
 
 export const actions: Actions = {
-	finish: async ({ request, platform, locals, url }) => {
+	finish: async ({ request, platform, locals, url, cookies }) => {
 		const { actor, orgId } = context(locals);
 		const ctx = createCtx(platform);
+		const analytics = cookies.get(CONSENT_COOKIE) === CONSENT_GRANTED;
 		const planId = String((await request.formData()).get('plan') || '');
 
 		let checkoutUrl: string | null = null;
@@ -48,7 +50,8 @@ export const actions: Actions = {
 				if (productId) {
 					checkoutUrl = await startCheckout(ctx, platform!.env, actor, orgId, {
 						productId,
-						successUrl: `${url.origin}/app/billing?checkout=success`
+						successUrl: `${url.origin}/app/billing?checkout=success`,
+						analytics
 					});
 				}
 			}

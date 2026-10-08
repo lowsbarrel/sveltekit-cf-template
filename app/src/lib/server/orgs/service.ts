@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gt } from 'drizzle-orm';
 import { can, type PermissionRequest } from '$lib/permissions';
 import { invitation, member, organization, session, user } from '../db/schema';
 import { AppError } from '../errors';
@@ -74,7 +74,13 @@ export async function listTeam(ctx: Ctx, actor: Actor, orgId: string) {
 				expiresAt: invitation.expiresAt
 			})
 			.from(invitation)
-			.where(and(eq(invitation.organizationId, orgId), eq(invitation.status, 'pending')))
+			.where(
+				and(
+					eq(invitation.organizationId, orgId),
+					eq(invitation.status, 'pending'),
+					gt(invitation.expiresAt, new Date())
+				)
+			)
 	]);
 	return { members, invites };
 }

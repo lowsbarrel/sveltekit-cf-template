@@ -18,8 +18,7 @@ const INFRA = [
 	'eslint.config',
 	'prettier',
 	'tsconfig',
-	'vite.config',
-	'svelte.config'
+	'vite.config'
 ];
 
 const git = (args, opts = {}) => execFileSync('git', args, { encoding: 'utf8', ...opts }).trim();

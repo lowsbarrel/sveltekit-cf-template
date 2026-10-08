@@ -1,8 +1,11 @@
 import { and, count, desc, eq, gt, isNull } from 'drizzle-orm';
 import { INBOX_LIMIT, type NotifBodyKey, type NotifKind } from '$lib/notifications';
-import { member, notification } from '../db/schema';
+import { member, notification, type Notification } from '../db/schema';
 import { AppError } from '../errors';
 import type { Actor, Ctx } from '../ctx';
+
+// 1000 rows x 5 params stays far under Postgres' 65535-parameter cap.
+const NOTIFY_BATCH = 1000;
 
 export type NotifyInput = {
 	kind?: NotifKind;
@@ -32,11 +35,15 @@ export async function notifyOrg(ctx: Ctx, orgId: string, input: NotifyInput & { 
 		.from(member)
 		.where(eq(member.organizationId, orgId));
 	const targets = members.map((m) => m.userId).filter((id) => id !== input.except);
-	if (!targets.length) return [];
-	return ctx.db
-		.insert(notification)
-		.values(targets.map((userId) => row(userId, input)))
-		.returning();
+	const created: Notification[] = [];
+	for (let i = 0; i < targets.length; i += NOTIFY_BATCH) {
+		const rows = await ctx.db
+			.insert(notification)
+			.values(targets.slice(i, i + NOTIFY_BATCH).map((userId) => row(userId, input)))
+			.returning();
+		created.push(...rows);
+	}
+	return created;
 }
 
 export async function listNotifications(ctx: Ctx, actor: Actor, limit = INBOX_LIMIT) {

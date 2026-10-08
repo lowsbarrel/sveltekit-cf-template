@@ -25,7 +25,7 @@ await notifyOrg(ctx, orgId, {
 });
 ```
 
-Send it post-response via `ctx.waitUntil(...)` when the notification isn't part of the action's result - the way `createNote` does.
+Send it post-response via `ctx.waitUntil(...)` when the notification isn't part of the action's result - the way `createNote` does. `notifyOrg` inserts in batches of 1000 rows (5000 params), so an org of any size stays under Postgres' 65535-parameter limit.
 
 ## Two kinds
 
@@ -38,7 +38,7 @@ Example - a new note tells other members both things: a `message` ("New note: â€
 
 The store fetches the inbox once (`GET /app/notifications`), then opens the stream through `eventStream` (`$lib/event-stream.ts`). The endpoint is a thin adapter over `sseResponse` (`$lib/server/sse.ts`), the shared primitive every subscription stream uses - see [streaming.md](streaming.md). It polls `ctx.db` (never `dbCached`) for rows past the cursor and sends each with its id; a dropped connection is retried by `EventSource` itself and resumes from `Last-Event-ID`, so nothing is missed. Each connection is bounded (~5 min) and the loop stops on client disconnect (`cancel`). One open stream is one request - well under the rate limit.
 
-Reads are owner-scoped in the service, so a user only ever sees, streams, or marks their own notifications. Nothing prunes them yet - the maintenance cron only clears expired sessions and verifications; to cap the table, extend `purgeExpired` to delete old rows.
+Reads are owner-scoped in the service, so a user only ever sees, streams, or marks their own notifications. The maintenance cron prunes them: `purgeExpired` deletes rows older than 90 days alongside expired sessions and verifications, so the inbox is a recent-activity view, not an archive. The `webhook_event` rows that dedupe Creem retries are pruned after 30 days, far beyond Creem's 30s/1m/5m/1h retry schedule ([billing.md](billing.md)) - both deletes ride the `notification_created_at_idx` / `webhook_event_received_at_idx` indexes so they never scan the whole table.
 
 ## When it breaks
 

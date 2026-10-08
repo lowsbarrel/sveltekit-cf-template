@@ -87,20 +87,21 @@ for (const f of ['../AGENTS.md', '../README.md', '../README-IT.md', 'messages/en
 	if (existsSync(f)) dashCheck(join(ROOT, f), read(f));
 }
 
-const NEUTRAL =
-	/\b(?:gray|slate|zinc|neutral|stone|red|rose|green|emerald|lime|amber|yellow|orange)-\d|\bbg-white\b/;
+const PALETTE =
+	'slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
+const RAW_PALETTE = new RegExp(
+	`\\b(?:bg-white|(?:text|bg|border|ring|fill|stroke|from|via|to|outline|divide|decoration|accent|caret|placeholder)-(?:${PALETTE})-\\d)`
+);
 walk('src', ['.svelte'], (p, c) => {
-	if (/\bblue-\d/.test(c))
-		fail(rel(p), 'raw `blue-` palette - use the `primary-*` brand token (docs/ui.md)');
 	if (/\btext-primary-\d/.test(c))
 		fail(
 			rel(p),
 			'`text-primary-*` - use `text-link`, which stays readable in dark mode (docs/ui.md)'
 		);
-	if (NEUTRAL.test(c))
+	if (RAW_PALETTE.test(c))
 		fail(
 			rel(p),
-			'raw neutral/status palette - use the semantic tokens so dark mode works (docs/ui.md)'
+			'raw palette - use the `primary-*` brand token or a semantic token so dark mode works (docs/ui.md)'
 		);
 });
 

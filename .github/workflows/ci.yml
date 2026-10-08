@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Fail if template placeholders were not replaced
         if: ${{ !github.event.repository.is_template }}
-        run: '! grep -rniE "sveltekit[-_ ]?cf[-_ ]?template|__HYPERDRIVE_ID__" package.json wrangler.jsonc src'
+        run: '! grep -rniE "sveltekit[-_ ]?cf[-_ ]?template|__[A-Z_]+_ID__" package.json wrangler.jsonc src'
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 24
@@ -130,13 +130,14 @@ jobs:
 
   ci:
     if: ${{ always() }}
-    needs: [conventions, test, portability, audit]
+    needs: [conventions, test, portability, audit, trivy]
     runs-on: ubuntu-latest
     steps:
       - name: All required jobs succeeded
         run: |
           for r in "${{ needs.conventions.result }}" "${{ needs.test.result }}" \
-                   "${{ needs.portability.result }}" "${{ needs.audit.result }}"; do
+                   "${{ needs.portability.result }}" "${{ needs.audit.result }}" \
+                   "${{ needs.trivy.result }}"; do
             case "$r" in
               success | skipped) ;;
               *) echo "required job did not succeed: $r"; exit 1 ;;
@@ -244,4 +245,4 @@ jobs:
           scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: '0'
+          exit-code: '1'

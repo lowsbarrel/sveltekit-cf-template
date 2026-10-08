@@ -258,6 +258,16 @@
 	"team_invite_revoke": "Revoke",
 	"team_invite_revoked": "Invitation revoked.",
 	"team_invite_failed": "Could not send the invitation. Please try again.",
+	"team_invite_limit_reached": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "Your plan allows {count} member. Upgrade to invite more.",
+				"countPlural=*": "Your plan allows {count} members. Upgrade to invite more."
+			}
+		}
+	],
 	"team_member_remove": "Remove",
 	"team_member_removed": "Member removed.",
 	"team_role_updated": "Role updated.",
@@ -376,6 +386,8 @@
 	"newsletter_confirm_invalid_heading": "Link invalid or expired",
 	"newsletter_confirm_invalid_body": "That confirmation link is invalid or has expired. Try subscribing again.",
 	"newsletter_confirm_home": "Back to home",
+	"newsletter_confirm_prompt": "Click below to confirm your subscription.",
+	"newsletter_confirm_button": "Confirm subscription",
 	"email_newsletter_subject": "Confirm your newsletter subscription",
 	"email_newsletter_heading": "Confirm your subscription",
 	"email_newsletter_body": "Use the link below to confirm you want to receive the {app} newsletter. It expires in 24 hours. If you didn't request this, ignore this email.",

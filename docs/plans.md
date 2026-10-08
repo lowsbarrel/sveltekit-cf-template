@@ -60,22 +60,25 @@ The **plan ↔ Creem product** mapping is server-only (`$lib/server/billing/plan
 The pattern, from the shipped todos example (`$lib/server/todos/service.ts`):
 
 ```ts
-import { requireWithinLimit } from '../billing/entitlement';
-
 export async function addTodo(ctx, env, actor, orgId, input) {
-	const [row] = await ctx.db.select({ value: count() }).from(todo).where(eq(todo.userId, actor.id));
-	await requireWithinLimit(ctx, env, orgId, 'maxTodos', row?.value ?? 0); // throws limit_reached at the cap
-	// ...insert
+	await requireMember(ctx, actor, orgId); // the quota applies to the caller's own org only
+	return ctx.db.transaction(async (tx) => {
+		// serialize this user's writers so count + check + insert are one step
+		await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${actor.id}))`);
+		const [row] = await tx.select({ value: count() }).from(todo).where(eq(todo.userId, actor.id));
+		await requireWithinLimit({ ...ctx, db: tx }, env, orgId, 'maxTodos', row?.value ?? 0); // throws limit_reached at the cap
+		// ...insert on tx
+	});
 }
 ```
 
-`requireWithinLimit` resolves the org's current plan (its paid tier while entitled, else free) and compares your count to that plan's limit. It's agnostic about _what_ is counted - you supply the current count.
+`requireWithinLimit` resolves the org's current plan - its best paid tier, a subscription **or** a lifetime purchase, else free - and compares your count to that plan's limit (via the single `planForOrg` resolver). It's agnostic about _what_ is counted - you supply the current count. **Count, check, and write must be one step**: take an advisory lock in the same transaction as the insert, or two concurrent requests both pass the check and overshoot the cap. The organization invite hook is the one place this can't be atomic (better-auth inserts the invitation after the hook), so it may overshoot by the number of simultaneous requests.
 
 ## Add a new limit
 
 1. Add the key to `PlanLimits` in `$lib/plans.ts` and give every plan a value.
 2. (Optional) Add a feature bullet in `planFeatures` (`$lib/plan-display.ts`) + a message.
-3. Call `requireWithinLimit(ctx, env, orgId, 'yourKey', currentCount)` before the write.
+3. Call `requireWithinLimit(ctx, env, orgId, 'yourKey', currentCount)` inside the write's transaction (see the lock note above).
 
 ## Add a new paid tier
 

@@ -69,6 +69,29 @@ describe('notifyOrg fan-out', () => {
 		expect(await listNotifications(ctx, bob)).toHaveLength(1);
 		expect(await listNotifications(ctx, outsider)).toHaveLength(0);
 	});
+
+	it('batches a fan-out larger than one insert', async () => {
+		const bulkOrg = 'org-bulk';
+		await ctx.db.insert(organization).values({ id: bulkOrg, name: 'Bulk', slug: 'bulk' });
+		const recipients = Array.from({ length: 1001 }, (_, i) => ({
+			id: crypto.randomUUID(),
+			name: 'M',
+			email: `m${i}@example.com`
+		}));
+		await ctx.db.insert(user).values(recipients);
+		await ctx.db.insert(member).values(
+			recipients.map((u) => ({
+				id: crypto.randomUUID(),
+				organizationId: bulkOrg,
+				userId: u.id,
+				role: 'member'
+			}))
+		);
+
+		const created = await notifyOrg(ctx, bulkOrg, { bodyKey: 'notif_note_created', params: {} });
+
+		expect(created).toHaveLength(1001);
+	});
 });
 
 describe('read state and cursor', () => {

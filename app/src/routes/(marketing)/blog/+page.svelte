@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import Seo from '$lib/components/seo/Seo.svelte';
+	import { formatDate } from '$lib/blog';
 	import * as m from '$lib/paraglide/messages';
 	import type { PageProps } from './$types';
 
@@ -10,14 +11,6 @@
 	const visible = $derived(
 		selected ? data.posts.filter((post) => post.category === selected) : data.posts
 	);
-
-	function formatDate(iso: string) {
-		return new Date(iso).toLocaleDateString(undefined, {
-			year: 'numeric',
-			month: 'long',
-			day: 'numeric'
-		});
-	}
 </script>
 
 <Seo title={m.blog_title()} description={m.blog_meta_description()} />

@@ -37,7 +37,12 @@ return sseResponse(
 The rules that keep one honest:
 
 - **Every frame carries an id, and the id is the cursor.** That is what makes a
-  reconnect resumable: the browser sends it back as `Last-Event-ID`.
+  reconnect resumable: the browser sends it back as `Last-Event-ID`. On
+  (re)connect the notifications route resolves the starting cursor in order -
+  `Last-Event-ID`, then `?since`, then the newest row's id when neither parses to
+  a number - and the inbox endpoint returns that same cursor (the newest row it
+  actually listed, not a separate max-id query) so no row can slip between the
+  list snapshot and the stream.
 - **Bound the connection** (notifications: ~5 min) and let the client reconnect.
   A stream that lives forever is a stream you cannot deploy past.
 - **Poll `ctx.db`, never `ctx.dbCached`** - a 60s-stale read defeats the point.

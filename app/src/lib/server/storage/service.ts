@@ -45,36 +45,38 @@ export function assertUploadWithin(
 	}
 }
 
-async function presign(env: Env, method: 'GET' | 'PUT', key: string, expiresIn: number) {
+async function presignUpload(
+	env: Env,
+	key: string,
+	expiresIn: number,
+	headers: Record<string, string>
+) {
 	assertSafeKey(key);
 	const { aws, base } = r2(env);
 	const url = new URL(`${base}/${key}`);
 	url.searchParams.set('X-Amz-Expires', String(expiresIn));
-	const signed = await aws.sign(new Request(url, { method }), { aws: { signQuery: true } });
+	const signed = await aws.sign(url.toString(), {
+		method: 'PUT',
+		headers,
+		aws: { signQuery: true, allHeaders: Object.keys(headers).length > 0 }
+	});
 	return signed.url;
 }
 
 export async function presignedUploadUrl(
 	env: Env,
 	key: string,
-	{ contentType, expiresIn = 600 }: { contentType?: string; expiresIn?: number } = {}
+	{
+		contentType,
+		contentLength,
+		expiresIn = 600
+	}: { contentType?: string; contentLength?: number; expiresIn?: number } = {}
 ) {
-	if (!contentType) return presign(env, 'PUT', key, expiresIn);
-	assertSafeKey(key);
-	const { aws, base } = r2(env);
-	const url = new URL(`${base}/${key}`);
-	url.searchParams.set('X-Amz-Expires', String(expiresIn));
-	const signed = await aws.sign(
-		new Request(url, { method: 'PUT', headers: { 'content-type': contentType } }),
-		{
-			aws: { signQuery: true, allHeaders: true }
-		}
-	);
-	return signed.url;
-}
-
-export function presignedDownloadUrl(env: Env, key: string, { expiresIn = 3600 } = {}) {
-	return presign(env, 'GET', key, expiresIn);
+	const headers: Record<string, string> = {};
+	if (contentType) headers['content-type'] = contentType;
+	// Signing content-length makes R2 reject a body whose size differs from the declared one
+	if (contentLength != null) headers['content-length'] = String(contentLength);
+	return presignUpload(env, key, expiresIn, headers);
 }
 
 export async function uploadedObjectMeta(

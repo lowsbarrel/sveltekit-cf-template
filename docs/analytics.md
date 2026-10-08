@@ -1,12 +1,12 @@
 # Analytics (PostHog)
 
-Product analytics wired the privacy-first way: PostHog loads **only after the user consents**, nothing tracks until then, and the whole thing disables cleanly when no key is set. Server-side capture covers key business events regardless of client consent.
+Product analytics wired the privacy-first way: PostHog loads **only after the user consents**, nothing tracks until then, and the whole thing disables cleanly when no key is set. Server-side capture is gated the same way: it runs only when the request carries the granted consent cookie, so declining leaves the server silent too.
 
 ## What's wired
 
 - **Consent alert** - `$lib/components/ConsentBanner.svelte`, rendered from the root layout so it appears everywhere (including the prerendered marketing pages). It shows **only when PostHog is configured** and consent is undecided; Accept loads PostHog, Decline stores the choice and loads nothing. The choice lives in a first-party `sveltekit_cf_template_consent` cookie (`$lib/consent.ts`).
 - **Client** - `$lib/analytics.ts`. `posthog-js` is **dynamically imported** by `initAnalytics()`, so there is no script, no network call, and no cookie until consent is granted. `identifyUser` ties events to the signed-in user (called from `app/+layout.svelte`); `resetAnalytics` clears identity on sign-out; `captureEvent` sends custom events.
-- **Server** - `$lib/server/analytics/service.ts`'s `captureServer(env, …)` posts first- party events straight to PostHog's capture API. It's wired into `startCheckout` (`checkout_started`) via `ctx.waitUntil`, so it never blocks or breaks a request. Add more the same way (signup, `subscription.paid`, …).
+- **Server** - `$lib/server/analytics/service.ts`'s `captureServer(env, …)` posts first- party events straight to PostHog's capture API. It's wired into `startCheckout` (`checkout_started`) and `cancelSubscription` (`subscription_canceled`) through `captureServerIfConsented`, which skips the capture unless the route adapter passes the consent boolean it reads from the `$lib/consent.ts` cookie - `granted` only, undecided and declined both skip capture. `ctx.waitUntil` keeps it off the request path. Add more the same way (signup, `subscription.paid`, …).
 
 Everything is a no-op when `PUBLIC_POSTHOG_KEY` is unset - the app, the banner, and the server capture all stand down, so the template runs with zero analytics out of the box.
 

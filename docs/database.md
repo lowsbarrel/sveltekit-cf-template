@@ -31,6 +31,8 @@ CREATE INDEX CONCURRENTLY "notification_user_id_id_idx" ON "notification" ("user
 
 The committed migration is written `CREATE INDEX IF NOT EXISTS` so it stays correct either way: a no-op in production once the concurrent build finished, a plain create in dev and CI where the table is empty. This is the one sanctioned reason to touch a generated migration.
 
+The maintenance cron's purge deletes filter on `session.expires_at`, `verification.expires_at`, `notification.created_at`, and `webhook_event.received_at`, so each of those carries its own index - a purge is then an index range scan rather than a full-table scan, and all four were committed the same `IF NOT EXISTS` way.
+
 Every new table must also be added to the truncate list in `tests/isolate-db.ts` - a missing table leaks rows between tests and between runs, and a table with no foreign key is not reached by `CASCADE`.
 
 ## Money and precision

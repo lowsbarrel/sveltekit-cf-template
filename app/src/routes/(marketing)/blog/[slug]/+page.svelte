@@ -2,19 +2,12 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import Seo from '$lib/components/seo/Seo.svelte';
+	import { formatDate } from '$lib/blog';
 	import * as m from '$lib/paraglide/messages';
 	import { articleJsonLd } from '$lib/utils/seo';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
-
-	function formatDate(iso: string) {
-		return new Date(iso).toLocaleDateString(undefined, {
-			year: 'numeric',
-			month: 'long',
-			day: 'numeric'
-		});
-	}
 </script>
 
 <Seo
