@@ -2,8 +2,8 @@ import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { can } from '$lib/permissions';
 import { createWorkerCtx } from '../ctx';
-import { member, organization, user } from '../db/schema';
-import { renameOrganization, requireMember } from './service';
+import { member, organization, invitation, user } from '../db/schema';
+import { renameOrganization, requireMember, listTeam } from './service';
 
 const ctx = createWorkerCtx(env);
 
@@ -58,5 +58,31 @@ describe('orgs service', () => {
 		await expect(renameOrganization(ctx, { id: plain }, orgId, 'Nope')).rejects.toMatchObject({
 			code: 'forbidden'
 		});
+	});
+
+	it('lists only unexpired pending invitations', async () => {
+		await ctx.db.insert(invitation).values([
+			{
+				id: 'inv-live',
+				organizationId: orgId,
+				email: 'live@example.com',
+				role: 'member',
+				status: 'pending',
+				expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+				inviterId: owner
+			},
+			{
+				id: 'inv-dead',
+				organizationId: orgId,
+				email: 'dead@example.com',
+				role: 'member',
+				status: 'pending',
+				expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+				inviterId: owner
+			}
+		]);
+
+		const { invites } = await listTeam(ctx, { id: owner }, orgId);
+		expect(invites.map((i) => i.id)).toEqual(['inv-live']);
 	});
 });

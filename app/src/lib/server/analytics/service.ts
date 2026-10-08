@@ -1,3 +1,5 @@
+import type { Ctx } from '../ctx';
+
 type ServerEvent = {
 	event: string;
 	distinctId: string;
@@ -23,4 +25,9 @@ export async function captureServer(env: Env, { event, distinctId, properties }:
 	} catch (e) {
 		console.error({ event: 'analytics.capture_failed', name: event }, e);
 	}
+}
+
+export function captureServerIfConsented(ctx: Ctx, env: Env, consent: boolean, event: ServerEvent) {
+	if (!consent) return;
+	ctx.waitUntil(captureServer(env, event));
 }

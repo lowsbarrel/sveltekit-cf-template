@@ -90,6 +90,8 @@ The GUC is set with `set_config(..., true)` - the third argument is `is_local`, 
 
   Point the production connection string (the one behind Hyperdrive) at `app_runtime`, and RLS enforces.
 
+  The **backup role** is the deliberate exception ([backups.md](backups.md)): `pg_dump` disables `row_security`, so it needs `BYPASSRLS` (not just `pg_read_all_data`) to read a `FORCE`d table - and so does the role a restore runs as.
+
 The RLS _policy_ (migration `0004`) and its `FORCE` (migration `0008`) are both committed, so they apply everywhere the migrations run. Role creation is deliberately **not** in a migration: `CREATE ROLE` is cluster-scoped and provider-specific, and running it against Neon/production from `drizzle/` would be fragile or fail - provisioning the _role_ is the one-time production step, done here.
 
 ### What the tests verify (and what they can't)

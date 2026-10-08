@@ -155,16 +155,12 @@ export async function applyWebhookEvent(
 			.where(eq(subscription.organizationId, orgId));
 		const sameSub = current?.creemSubscriptionId === snapshot.creemSubscriptionId;
 
-		if (current) {
-			if (sameSub) {
-				if (current.lastEventAt >= eventAt) {
-					console.log({ event: 'billing.webhook_stale', id: event.id, type: event.type });
-					return { status: 'stale' } as const;
-				}
-			} else if (!ENTITLED_STATUSES[snapshot.status]) {
-				console.log({ event: 'billing.webhook_stale', id: event.id, type: event.type });
-				return { status: 'stale' } as const;
-			}
+		if (
+			current &&
+			(current.lastEventAt >= eventAt || (!sameSub && !ENTITLED_STATUSES[snapshot.status]))
+		) {
+			console.log({ event: 'billing.webhook_stale', id: event.id, type: event.type });
+			return { status: 'stale' } as const;
 		}
 
 		const values = {
@@ -199,7 +195,7 @@ export async function applyWebhookEvent(
 			.onConflictDoUpdate({
 				target: subscription.organizationId,
 				set: values,
-				setWhere: sql`${subscription.creemSubscriptionId} <> ${values.creemSubscriptionId} or ${subscription.lastEventAt} <= ${eventAt.toISOString()}::timestamptz`
+				setWhere: sql`${subscription.lastEventAt} <= ${eventAt.toISOString()}::timestamptz`
 			});
 
 		console.log({

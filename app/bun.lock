@@ -62,7 +62,6 @@
   },
   "trustedDependencies": [
     "esbuild",
-    "sharp",
     "workerd",
   ],
   "overrides": {

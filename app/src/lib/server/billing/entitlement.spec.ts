@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FREE_PLAN } from '$lib/plans';
+import { purchase } from '../db/schema';
 import { ctx, orgId, seedBillingOrg } from './fixtures';
 import {
 	classifyBillingTransition,
@@ -40,6 +41,22 @@ describe('entitlement', () => {
 		await expect(requireActiveSubscription(ctx, orgId)).rejects.toMatchObject({
 			code: 'forbidden'
 		});
+	});
+
+	it('resolves a purchase-only (lifetime) org onto its paid plan', async () => {
+		const lifeEnv = { ...env, CREEM_PRODUCT_LIFETIME: 'prod_life' } as Env;
+		await ctx.db.insert(purchase).values({
+			id: crypto.randomUUID(),
+			organizationId: orgId,
+			creemOrderId: 'order_life',
+			creemCustomerId: 'cust_life',
+			creemProductId: 'prod_life',
+			status: 'paid',
+			purchasedAt: new Date()
+		});
+
+		expect((await planForOrg(ctx, env, orgId)).id).toBe('free');
+		expect((await planForOrg(ctx, lifeEnv, orgId)).id).toBe('lifetime');
 	});
 });
 

@@ -44,7 +44,10 @@ export const session = pgTable(
 		activeOrganizationId: text('active_organization_id'),
 		...timestamps
 	},
-	(t) => [index('session_user_id_idx').on(t.userId)]
+	(t) => [
+		index('session_user_id_idx').on(t.userId),
+		index('session_expires_at_idx').on(t.expiresAt)
+	]
 );
 
 export const account = pgTable(
@@ -135,7 +138,10 @@ export const verification = pgTable(
 		expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 		...timestamps
 	},
-	(t) => [index('verification_identifier_idx').on(t.identifier)]
+	(t) => [
+		index('verification_identifier_idx').on(t.identifier),
+		index('verification_expires_at_idx').on(t.expiresAt)
+	]
 );
 
 export const subscription = pgTable('subscription', {
@@ -161,7 +167,10 @@ export const webhookEvent = pgTable(
 		eventType: text('event_type').notNull(),
 		receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow()
 	},
-	(t) => [index('webhook_event_provider_received_at_idx').on(t.provider, t.receivedAt)]
+	(t) => [
+		index('webhook_event_provider_received_at_idx').on(t.provider, t.receivedAt),
+		index('webhook_event_received_at_idx').on(t.receivedAt)
+	]
 );
 
 export type Subscription = typeof subscription.$inferSelect;
@@ -300,7 +309,10 @@ export const notification = pgTable(
 		readAt: timestamp('read_at', { withTimezone: true }),
 		...timestamps
 	},
-	(t) => [index('notification_user_id_id_idx').on(t.userId, t.id)]
+	(t) => [
+		index('notification_user_id_id_idx').on(t.userId, t.id),
+		index('notification_created_at_idx').on(t.createdAt)
+	]
 );
 
 export type Notification = typeof notification.$inferSelect;

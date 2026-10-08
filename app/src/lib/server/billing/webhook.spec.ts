@@ -127,6 +127,43 @@ describe('webhooks', () => {
 		});
 	});
 
+	it('ignores an entitled event from a superseded subscription older than the current row', async () => {
+		await applyWebhookEvent(ctx, env, event({ id: 'evt_1' }));
+		await applyWebhookEvent(
+			ctx,
+			env,
+			event({
+				id: 'evt_2',
+				createdAt: Date.parse('2026-09-01T12:00:00Z'),
+				data: {
+					id: 'sub_2',
+					status: 'active',
+					customer: 'cust_1',
+					product: 'prod_1',
+					current_period_end_date: '2099-10-01T12:00:00.000Z',
+					metadata: { organizationId: orgId }
+				}
+			})
+		);
+
+		const retriedOldPaid = event({
+			id: 'evt_old_paid',
+			createdAt: Date.parse('2026-08-01T12:00:00Z'),
+			data: {
+				id: 'sub_1',
+				status: 'active',
+				customer: 'cust_1',
+				product: 'prod_1',
+				current_period_end_date: '2099-08-01T12:00:00.000Z',
+				metadata: { organizationId: orgId }
+			}
+		});
+		expect(await applyWebhookEvent(ctx, env, retriedOldPaid)).toEqual({ status: 'stale' });
+
+		const [row] = await ctx.db.select().from(subscription);
+		expect(row!.creemSubscriptionId).toBe('sub_2');
+	});
+
 	it('replaces the row when an org re-subscribes after cancelling', async () => {
 		await applyWebhookEvent(ctx, env, event({ id: 'evt_1' }));
 

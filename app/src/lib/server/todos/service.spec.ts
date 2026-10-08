@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { user } from '../db/schema';
+import { FREE_PLAN } from '$lib/plans';
+import { member, organization, user } from '../db/schema';
 import { createWorkerCtx, type Actor } from '../ctx';
 import { addTodo, listTodos, setTodoDone } from './service';
 
@@ -19,6 +20,13 @@ beforeEach(async () => {
 		.returning();
 	actor = { id: rows[0]!.id };
 	other = { id: rows[1]!.id };
+	await ctx.db.insert(organization).values({ id: orgId, name: 'Todos', slug: 'todos' });
+	await ctx.db.insert(member).values({
+		id: crypto.randomUUID(),
+		organizationId: orgId,
+		userId: actor.id,
+		role: 'owner'
+	});
 });
 
 describe('todos service', () => {
@@ -44,5 +52,21 @@ describe('todos service', () => {
 
 		const updated = await setTodoDone(ctx, actor, created.id, true);
 		expect(updated.done).toBe(true);
+	});
+
+	it('refuses an org the actor does not belong to', async () => {
+		await expect(addTodo(ctx, env, other, orgId, { title: 'Nope' })).rejects.toMatchObject({
+			code: 'forbidden'
+		});
+	});
+
+	it('enforces the free plan quota on the locked path', async () => {
+		const limit = FREE_PLAN.limits.maxTodos!;
+		for (let i = 0; i < limit; i++) {
+			await addTodo(ctx, env, actor, orgId, { title: `todo ${i}` });
+		}
+		await expect(addTodo(ctx, env, actor, orgId, { title: 'one too many' })).rejects.toMatchObject({
+			code: 'limit_reached'
+		});
 	});
 });

@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ platform, locals }) => {
 	const user = locals.user;
 	if (!user) redirect(302, '/login');
 	try {
-		const blocked = await ownsEntitledOrg(createCtx(platform), { id: user.id });
+		const blocked = await ownsEntitledOrg(createCtx(platform), platform!.env, { id: user.id });
 		return { blocked };
 	} catch (e) {
 		httpError(e);

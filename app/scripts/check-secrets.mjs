@@ -19,7 +19,8 @@ const PATTERNS = [
 	[/sk_(?:live|test)_[A-Za-z0-9]{16,}/, 'Stripe secret key'],
 	[/creem_(?:live|test)_[A-Za-z0-9]{20,}/, 'Creem API key'],
 	[/xox[baprs]-[A-Za-z0-9-]{10,}/, 'Slack token'],
-	[/gh[pousr]_[A-Za-z0-9]{30,}/, 'GitHub token']
+	[/gh[pousr]_[A-Za-z0-9]{30,}/, 'GitHub token'],
+	[/[a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:[^\s@/]+@(?!localhost|127\.0\.0\.1)/, 'credential in a URL']
 ];
 
 for (const f of files) {

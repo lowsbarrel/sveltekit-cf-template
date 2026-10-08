@@ -7,7 +7,7 @@ A double opt-in newsletter for anonymous visitors. Someone enters their email on
 1. The prerendered landing renders `$lib/components/newsletter/NewsletterSignup.svelte`. A prerendered page cannot read `env`, so the component fetches `GET /api/newsletter/subscribe` on mount to learn whether Turnstile is configured (`{ turnstileSiteKey }`), then renders the widget only when a site key is present. The form submits by client `fetch`, not a form action.
 2. `POST /api/newsletter/subscribe` is a thin adapter: it builds a `Ctx` with `createCtx(platform)`, reads `cf-connecting-ip`, passes `url.origin`, calls the service, converts errors with `httpError(e)`, and **always** returns `202 { ok: true }` on the success path.
 3. `subscribe(ctx, env, origin, ip, input, captchaToken)` in `$lib/server/newsletter/service.ts` validates the email, verifies Turnstile (opt-in), rate-limits per IP, upserts a `pending` subscriber with a fresh hashed confirm token, and enqueues the confirmation email through `ctx.waitUntil`.
-4. The link lands on `src/routes/newsletter/confirm/`, a non-prerendered route whose `load` calls `confirm(ctx, token)`. `+page.svelte` renders a generic confirmed / invalid-or-expired state behind `<Seo noindex />`.
+4. The link lands on `src/routes/newsletter/confirm/`, a non-prerendered route. `load` only reads the token and returns it; the page shows a Confirm button whose form `POST`s to the `default` action, so an email-link scanner that merely fetches links cannot auto-confirm. The action calls `confirm(ctx, token)`, and `+page.svelte` renders a generic confirmed / invalid-or-expired state behind `<Seo noindex />`.
 
 ## The table
 
@@ -43,7 +43,7 @@ The confirmation email is templated in `$lib/server/email/templates/newsletter-e
 
 ## Notes and gotchas
 
-- The confirm link is a `GET` (like magic-link/verify), so an email security scanner that fetches links could auto-confirm. That is acceptable for double opt-in and consistent with the rest of the template; if you want stricter proof of intent, make confirm a `POST` form action behind a button on the confirm page.
+- The confirm link is a `GET`, but confirmation itself is a `POST` form action behind a button, so an email security scanner that only fetches links cannot auto-confirm - it would have to submit the form. Magic-link and verify-email still confirm on `GET`; make them `POST` behind a button too if you need the same protection there.
 - The email link must be absolute, so the service takes `url.origin` from the live `/api` request rather than `SITE.url` - prerendering has no real origin, but the endpoint does.
 - `newsletter/confirm` is deliberately **not** in `sitemap.xml`: it is `noindex` and dynamic. The landing page is already listed.
 - New table means the truncate list in `tests/isolate-db.ts` includes `newsletter_subscriber` (it has no foreign key, so `CASCADE` will not reach it), and a committed migration was generated with `bun run db:generate`.

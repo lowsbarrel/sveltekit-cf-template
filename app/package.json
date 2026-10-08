@@ -10,8 +10,7 @@
 	},
 	"trustedDependencies": [
 		"esbuild",
-		"workerd",
-		"sharp"
+		"workerd"
 	],
 	"overrides": {
 		"fast-uri": "^3.1.6",

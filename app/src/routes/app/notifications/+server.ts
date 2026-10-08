@@ -15,11 +15,9 @@ export const GET: RequestHandler = async ({ locals, platform }) => {
 	const ctx = createCtx(platform);
 	const actor = { id: user.id };
 	try {
-		const [notifications, latestId] = await Promise.all([
-			listNotifications(ctx, actor),
-			latestNotificationId(ctx, actor)
-		]);
-		return json({ notifications, latestId });
+		const latestId = await latestNotificationId(ctx, actor);
+		const notifications = await listNotifications(ctx, actor);
+		return json({ notifications, latestId: notifications[0]?.id ?? latestId });
 	} catch (e) {
 		httpError(e);
 	}

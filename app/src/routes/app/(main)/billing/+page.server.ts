@@ -1,5 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import { planById } from '$lib/plans';
+import { CONSENT_COOKIE, CONSENT_GRANTED } from '$lib/consent';
 import { cancelSubscription, openBillingPortal, startCheckout } from '$lib/server/billing/checkout';
 import { getBillingOverview } from '$lib/server/billing/entitlement';
 import { syncSubscription } from '$lib/server/billing/resync';
@@ -34,8 +35,9 @@ export const load: PageServerLoad = async ({ platform, locals, url }) => {
 };
 
 export const actions: Actions = {
-	checkout: async ({ request, platform, locals, url }) => {
+	checkout: async ({ request, platform, locals, url, cookies }) => {
 		const { actor, orgId } = context(locals);
+		const analytics = cookies.get(CONSENT_COOKIE) === CONSENT_GRANTED;
 
 		const form = await request.formData();
 		const planId = String(form.get('plan')) as PlanId;
@@ -50,7 +52,8 @@ export const actions: Actions = {
 		try {
 			checkoutUrl = await startCheckout(createCtx(platform), platform!.env, actor, orgId, {
 				productId,
-				successUrl: `${url.origin}/app/billing?checkout=success`
+				successUrl: `${url.origin}/app/billing?checkout=success`,
+				analytics
 			});
 		} catch (e) {
 			httpError(e);
@@ -69,10 +72,11 @@ export const actions: Actions = {
 		redirect(303, portalUrl);
 	},
 
-	cancel: async ({ platform, locals }) => {
+	cancel: async ({ platform, locals, cookies }) => {
 		const { actor, orgId } = context(locals);
+		const analytics = cookies.get(CONSENT_COOKIE) === CONSENT_GRANTED;
 		try {
-			await cancelSubscription(createCtx(platform), platform!.env, actor, orgId);
+			await cancelSubscription(createCtx(platform), platform!.env, actor, orgId, analytics);
 		} catch (e) {
 			httpError(e);
 		}

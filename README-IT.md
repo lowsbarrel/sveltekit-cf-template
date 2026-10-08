@@ -78,7 +78,7 @@ Prima che la CI passi sulla tua copia vanno sostituiti due segnaposto:
 1. **`sveltekit-cf-template`**, il token di identità, ovunque compaia in `app/package.json`, `app/wrangler.jsonc` e `app/src/` (il nome del sito in `site.ts`, il cookie del consenso, i post di esempio del blog). La CI lo cerca senza distinguere maiuscole e minuscole.
 2. **`__HYPERDRIVE_ID__`** in `app/wrangler.jsonc`, dopo aver creato la configurazione Hyperdrive.
 
-Le anteprime delle PR richiedono anche **`__PREVIEW_HYPERDRIVE_ID__`** nel blocco `previews` di `app/wrangler.jsonc`, puntato a una configurazione Hyperdrive per le anteprime; la CI non controlla questo segnaposto.
+La CI falla finché resta un segnaposto `__..._ID__` in `app/package.json`, `app/wrangler.jsonc` o `app/src/`, quindi vale anche per **`__PREVIEW_HYPERDRIVE_ID__`** nel blocco `previews` (puntalo a una configurazione Hyperdrive per le anteprime) e per gli id `HYPERDRIVE_CACHED` / `KV` commentati: riempili o eliminali.
 
 La funzionalità `todos` è un esempio completo dell'architettura (schema, servizio limitato all'utente, pagina protetta). Copiane la forma, poi eliminala. Il resto è in [docs/setup.md](docs/setup.md).
 

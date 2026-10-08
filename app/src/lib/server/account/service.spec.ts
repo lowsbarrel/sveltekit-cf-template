@@ -2,13 +2,14 @@ import { env } from 'cloudflare:workers';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AVATAR_MAX_BYTES } from '$lib/avatar';
-import { user } from '../db/schema';
+import { member, organization, purchase, user } from '../db/schema';
 import { createWorkerCtx, type Actor } from '../ctx';
 import {
 	avatarUploadTarget,
 	completeOnboarding,
 	confirmAvatarUpload,
 	eraseUserData,
+	ownsEntitledOrg,
 	storageConfigured
 } from './service';
 
@@ -89,5 +90,31 @@ describe('avatar upload target', () => {
 
 	it('eraseUserData is a no-op (never throws) when storage is unconfigured', async () => {
 		await expect(eraseUserData(env, alice.id)).resolves.toBeUndefined();
+	});
+});
+
+describe('ownsEntitledOrg', () => {
+	it('counts a one-time (lifetime) purchase as entitled and ignores free owners', async () => {
+		const lifeEnv = { ...env, CREEM_PRODUCT_LIFETIME: 'prod_life' } as Env;
+		const orgId = 'org-life';
+		await ctx.db.insert(organization).values({ id: orgId, name: 'Lifetime', slug: 'lifetime' });
+		await ctx.db.insert(member).values({
+			id: crypto.randomUUID(),
+			organizationId: orgId,
+			userId: alice.id,
+			role: 'owner'
+		});
+		await ctx.db.insert(purchase).values({
+			id: crypto.randomUUID(),
+			organizationId: orgId,
+			creemOrderId: 'order_life',
+			creemCustomerId: 'cust_life',
+			creemProductId: 'prod_life',
+			status: 'paid',
+			purchasedAt: new Date()
+		});
+
+		expect(await ownsEntitledOrg(ctx, lifeEnv, alice)).toBe(true);
+		expect(await ownsEntitledOrg(ctx, lifeEnv, bob)).toBe(false);
 	});
 });

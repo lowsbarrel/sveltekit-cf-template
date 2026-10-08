@@ -1,8 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { subscription, user } from '../db/schema';
 import { AppError } from '../errors';
-import { captureServer } from '../analytics/service';
+import { captureServerIfConsented } from '../analytics/service';
 import { requirePermission } from '../orgs/service';
+import { planForOrg } from './entitlement';
 import { cancelCreemSubscription, createCheckoutSession, createPortalSession } from './creem';
 import type { Actor, Ctx } from '../ctx';
 
@@ -11,9 +12,13 @@ export async function startCheckout(
 	env: Env,
 	actor: Actor,
 	orgId: string,
-	input: { productId: string; successUrl: string }
+	input: { productId: string; successUrl: string; analytics: boolean }
 ) {
 	await requirePermission(ctx, actor, orgId, { billing: ['manage'] });
+
+	if ((await planForOrg(ctx, env, orgId)).paid) {
+		throw new AppError('conflict', 'This organization is already on a paid plan');
+	}
 
 	const [buyer] = await ctx.db.select().from(user).where(eq(user.id, actor.id));
 	if (!buyer) throw new AppError('not_found', 'User not found');
@@ -27,13 +32,11 @@ export async function startCheckout(
 	});
 
 	console.log({ event: 'billing.checkout_started', orgId, checkoutId: checkout.id });
-	ctx.waitUntil(
-		captureServer(env, {
-			event: 'checkout_started',
-			distinctId: actor.id,
-			properties: { orgId, productId: input.productId }
-		})
-	);
+	captureServerIfConsented(ctx, env, input.analytics, {
+		event: 'checkout_started',
+		distinctId: actor.id,
+		properties: { orgId, productId: input.productId }
+	});
 	return checkout.url;
 }
 
@@ -54,6 +57,7 @@ export async function cancelSubscription(
 	env: Env,
 	actor: Actor,
 	orgId: string,
+	analytics: boolean,
 	mode: 'immediate' | 'scheduled' = 'scheduled'
 ) {
 	await requirePermission(ctx, actor, orgId, { billing: ['manage'] });
@@ -66,11 +70,9 @@ export async function cancelSubscription(
 
 	await cancelCreemSubscription(env, row.creemSubscriptionId, mode);
 	console.log({ event: 'billing.cancel_requested', orgId, mode });
-	ctx.waitUntil(
-		captureServer(env, {
-			event: 'subscription_canceled',
-			distinctId: actor.id,
-			properties: { orgId, mode }
-		})
-	);
+	captureServerIfConsented(ctx, env, analytics, {
+		event: 'subscription_canceled',
+		distinctId: actor.id,
+		properties: { orgId, mode }
+	});
 }
